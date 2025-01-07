@@ -1,0 +1,10 @@
+description: GPIO pin for Loadcell
+
+compatible: "gpio-loadcell"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: |
+      TGPIO pin for Loadcell DOUT/SCK
