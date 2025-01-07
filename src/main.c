@@ -33,7 +33,7 @@ LOG_MODULE_REGISTER(main);
 #define ADS1115_REFERENCE ADC_REF_INTERNAL
 #define ADS1115_ACQUISITION_TIME ADC_ACQ_TIME(ADC_ACQ_TIME_TICKS, 4)
 
-static uint16_t holding_reg[8];
+static uint16_t gp8403_request[8];
 static int16_t ads1115_result[8];
 
 static struct LoadCell hx711_list[] = {
@@ -96,15 +96,15 @@ static int modbus_slave_coil_wr(uint16_t addr, bool state)
 
 static int modbus_slave_holding_reg_rd(uint16_t addr, uint16_t *reg)
 {
-	if (addr >= ARRAY_SIZE(holding_reg)) return -ENOTSUP;
-	*reg = holding_reg[addr];
+	if (addr >= ARRAY_SIZE(gp8403_request)) return -ENOTSUP;
+	*reg = gp8403_request[addr];
 	return 0;
 }
 
 static int modbus_slave_holding_reg_wr(uint16_t addr, uint16_t reg)
 {
-	if (addr >= ARRAY_SIZE(holding_reg)) return -ENOTSUP;
-	holding_reg[addr] = reg;
+	if (addr >= ARRAY_SIZE(gp8403_request)) return -ENOTSUP;
+	gp8403_request[addr] = reg;
 	return 0;
 }
 
@@ -286,7 +286,7 @@ int gp8403_init(uint8_t adr) {
 	return ret;
 }
 
-int gp8404_set_channel(uint8_t address, uint8_t channel_id, uint16_t data) {
+int gp8403_set_channel(uint8_t address, uint8_t channel_id, uint16_t data) {
 	struct i2c_msg msgs[1];
 	uint8_t buf[3];
 	int ret = 0;
@@ -306,7 +306,7 @@ int gp8404_set_channel(uint8_t address, uint8_t channel_id, uint16_t data) {
 	return ret;
 }
 
-int gp8404_set_channels(uint8_t address, uint16_t data_0, uint16_t data_1) {
+int gp8403_set_channels(uint8_t address, uint16_t data_0, uint16_t data_1) {
 	struct i2c_msg msgs[1];
 	uint8_t buf[5];
 	uint16_t send_data[2] = {0, 0};
@@ -328,45 +328,44 @@ int gp8404_set_channels(uint8_t address, uint16_t data_0, uint16_t data_1) {
 	return i2c_transfer(i2c_dev, &msgs[0], 1, address);
 }
 
-int gp8403_test(void) {
-	const uint8_t gp8403_adr = 0x58;
-
+int gp8403_task(void) {
+	const uint8_t gp8403_adr[] = {0x58, 0x59, 0x5A, 0x5B};
+	uint16_t previous_values[8] = {0};
 	int ret = 0;
 
 	// set GP8403 output range to 0-10V
-	ret = gp8403_init(gp8403_adr);
-	if (ret) {
-		LOG_ERR("Failed to init GP8403: %d", ret);
-		return ret;
+	for (int ch = 0; ch < 4; ch++) {
+		previous_values[2*ch + 0] = 0;
+		previous_values[2*ch + 1] = 0;
+		ret = gp8403_init(gp8403_adr[ch]);
+		if (ret) {
+			LOG_ERR("Failed to init GP8403 adrs:0x%2d", gp8403_adr[ch]);
+			return ret;
+		}
+		ret = gp8403_set_channels(gp8403_adr[ch], 0, 0);
+		if (ret) {
+			LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
+			return ret;
+		}
 	}
 
 	// Change Value step by step 0 to 10V in 1V steps
-	while (1) {
-		// CH 0
-		for (uint16_t data = 0; data <= 10000; data += 1000) {
-			ret = gp8404_set_channel(gp8403_adr, 0, data);
-			LOG_INF("GP8403 CH0: %.3lf[V]", (double)data/1000.0);
-			k_msleep(2000);
+	for (;;) {
+		for (int ch = 0; ch < 4; ch++) {
+			uint16_t req0 = gp8403_request[2*ch + 0];
+			uint16_t req1 = gp8403_request[2*ch + 1];
+			if (previous_values[2*ch + 0] != req0
+			 || previous_values[2*ch + 1] != req1) {
+				ret = gp8403_set_channels(gp8403_adr[ch], req0, req1);
+				previous_values[2*ch + 0] = req0;
+				previous_values[2*ch + 0] = req1;
+				if (ret) {
+					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
+					return ret;
+				}
+			}
 		}
-
-		// CH 1
-		for (uint16_t data = 0; data <= 10000; data += 1000) {
-			ret = gp8404_set_channel(gp8403_adr, 1, data);
-			LOG_INF("GP8403 CH1: %.3lf[V]", (double)data/1000.0);
-			k_msleep(2000);
-		}
-
-		// Both set
-		for (uint16_t data = 0; data <= 10000; data += 1000) {
-			ret = gp8404_set_channels(gp8403_adr, data, data);
-			LOG_INF("GP8403 CH0&1: %.3lf[V]", (double)data/1000.0);
-			k_msleep(2000);
-		}
-
-		// Reset to 0V
-		ret = gp8404_set_channels(gp8403_adr, 0, 0);
-		LOG_INF("GP8403 CH0&1: 0.000[V]");
-		k_msleep(2000);
+		k_msleep(1);
 	}
 }
 
@@ -380,4 +379,4 @@ K_THREAD_DEFINE(hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], true,  NU
 K_THREAD_DEFINE(hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(ads1115_0, ADS1115_STACK_SIZE, ads1115_main, 0, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(ads1115_1, ADS1115_STACK_SIZE, ads1115_main, 1, NULL, NULL, ADS1115_PRIORITY, 0, 0);
-//K_THREAD_DEFINE(gp8403, GP8403_STACK_SIZE, gp8403_test, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gp8403_all, GP8403_STACK_SIZE, gp8403_task, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
