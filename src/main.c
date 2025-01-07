@@ -164,11 +164,6 @@ int main(void)
 		return 0;
 	}
 
-	while (!dtr) {
-		uart_line_ctrl_get(modbus_dev, UART_LINE_CTRL_DTR, &dtr);
-		k_sleep(K_MSEC(100));
-	}
-
 	if (modbus_slave_init()) {
 		LOG_ERR("Modbus RTU server initialization failed");
 	}
@@ -363,35 +358,6 @@ int gp8403_test(void) {
 	}
 }
 
-int i2c_scanner(void) {
-	const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
-	while (1) {
-		k_msleep(10000);
-		uint8_t error = 0u;
-		uint8_t dst;
-		uint8_t i2c_dev_cnt = 0;
-		struct i2c_msg msgs[1];
-		msgs[0].buf = &dst;
-		msgs[0].len = 1U;
-		msgs[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
-
-		/* Use the full range of I2C address for display purpose */	
-		for (uint16_t x = 0; x <= 0x7f; x++) {
-			/* Range the test with the start and stop value configured in the kconfig */
-			if (x >= 8 && x <= 127)	{	
-				/* Send the address to read from */
-				error = i2c_transfer(i2c_dev, &msgs[0], 1, x);
-				/* I2C device found on current address */
-				if (error == 0) {
-					LOG_INF("I2C Scanner found: 0x%02x",x);
-					i2c_dev_cnt++;
-				}
-			}
-		}
-		LOG_INF("I2C Scanner found %d devices", i2c_dev_cnt);
-	}
-}
-
 K_THREAD_DEFINE(hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], NULL, NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], NULL, NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], NULL, NULL, HX711_PRIORITY, 0, 0);
@@ -401,5 +367,4 @@ K_THREAD_DEFINE(hx711_5, HX711_STACK_SIZE, hx711_main, &hx711_list[5], NULL, NUL
 K_THREAD_DEFINE(hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], NULL, NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], NULL, NULL, HX711_PRIORITY, 0, 0);
 //K_THREAD_DEFINE(ads1115_1, ADS1115_STACK_SIZE, ads1115_main, NULL, NULL, NULL, ADS1115_PRIORITY, 0, 0);
-K_THREAD_DEFINE(gp8403, GP8403_STACK_SIZE, gp8403_test, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
-//K_THREAD_DEFINE(i2c_scan, 1024, i2c_scanner, NULL, NULL, NULL, 0, 0, 0);
+//K_THREAD_DEFINE(gp8403, GP8403_STACK_SIZE, gp8403_test, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
