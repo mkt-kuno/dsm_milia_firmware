@@ -34,7 +34,7 @@ LOG_MODULE_REGISTER(main);
 #define ADS1115_ACQUISITION_TIME ADC_ACQ_TIME(ADC_ACQ_TIME_TICKS, 4)
 
 static uint16_t holding_reg[8];
-static int16_t input_reg_i16[16];
+static int16_t ads1115_result[8];
 
 static struct LoadCell hx711_list[] = {
 	{
@@ -75,8 +75,10 @@ static struct LoadCell hx711_list[] = {
 static const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
 static const struct device *const modbus_dev = DEVICE_DT_GET(DT_PARENT(MODBUS_NODE));
 static const struct gpio_dt_spec led_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
-static const struct device *const ads1115_1_dev = DEVICE_DT_GET(DT_NODELABEL(ads1115_1));
-static const struct device *const ads1115_2_dev = DEVICE_DT_GET(DT_NODELABEL(ads1115_2));
+static const struct device *const ads1115_dev[] = {
+	DEVICE_DT_GET(DT_NODELABEL(ads1115_1)),
+	DEVICE_DT_GET(DT_NODELABEL(ads1115_2)),
+};
 
 static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 {
@@ -113,7 +115,12 @@ static int modbus_slave_input_reg_rd(uint16_t addr, uint16_t *reg)
 		*reg = (uint16_t)(loadcell_get_filtered_value(&hx711_list[addr]) & 0xFFFF);
 	} else  if (addr < 16) {
 		// ADS1115 values
-		*reg = 0x0000;
+		uint32_t key = 0;
+		key = irq_lock();
+		{
+			*reg = ads1115_result[addr - 8];
+		}
+		irq_unlock(key);
 	} else {
 		return -ENOTSUP;
 	}
@@ -208,13 +215,13 @@ static struct adc_sequence ads1115_sequence[2] = {
 int ads1115_read_adc_channel(uint8_t unit_id, uint8_t channel_id)
 {
 	ads1115_channel_cfg[unit_id].input_positive = channel_id;
-
-    if (adc_channel_setup(ads1115_1_dev, &ads1115_channel_cfg[unit_id]) != 0) {
+	const struct device *const dev = ads1115_dev[unit_id];
+    if (adc_channel_setup(dev, &ads1115_channel_cfg[unit_id]) != 0) {
         LOG_ERR("Failed to setup ADC channel %d", channel_id);
         return -1;
     }
 
-    if (adc_read(ads1115_1_dev, &ads1115_sequence[unit_id]) != 0) {
+    if (adc_read(dev, &ads1115_sequence[unit_id]) != 0) {
         LOG_ERR("Failed to read ADC channel %d", channel_id);
         return -1;
     }
@@ -222,19 +229,24 @@ int ads1115_read_adc_channel(uint8_t unit_id, uint8_t channel_id)
     return ads1115_sample_buffer[unit_id];
 }
 
-void ads1115_main(void)
+void ads1115_main(void *param1, void *param2, void *param3)
 {
+	uint32_t key = 0;
+	uint8_t unit_id = (uint8_t)param1;
+	if (unit_id > 1) {
+		LOG_ERR("Invalid unit_id %d", unit_id);
+		return;
+	}
+
 	while (1) {
-		uint8_t unit_id = 0;
 		for (int channel = 0; channel < 4; channel++) {
 			int value = ads1115_read_adc_channel(unit_id, channel);
-			if (value < 0) {
-				LOG_ERR("Error reading channel %d", channel);
-			} else {
-				LOG_INF("ADS1115 U%d CH%d: %d", unit_id, channel, value);
+			key = irq_lock();
+			{
+				ads1115_result[unit_id * 4 + channel] = value;
 			}
+			irq_unlock(key);
 		}
-		k_sleep(K_SECONDS(1));
 	}
 }
 
@@ -365,5 +377,6 @@ K_THREAD_DEFINE(hx711_4, HX711_STACK_SIZE, hx711_main, &hx711_list[4], NULL, NUL
 K_THREAD_DEFINE(hx711_5, HX711_STACK_SIZE, hx711_main, &hx711_list[5], NULL, NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], NULL, NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], NULL, NULL, HX711_PRIORITY, 0, 0);
-//K_THREAD_DEFINE(ads1115_1, ADS1115_STACK_SIZE, ads1115_main, NULL, NULL, NULL, ADS1115_PRIORITY, 0, 0);
+K_THREAD_DEFINE(ads1115_0, ADS1115_STACK_SIZE, ads1115_main, 0, NULL, NULL, ADS1115_PRIORITY, 0, 0);
+K_THREAD_DEFINE(ads1115_1, ADS1115_STACK_SIZE, ads1115_main, 1, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 //K_THREAD_DEFINE(gp8403, GP8403_STACK_SIZE, gp8403_test, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
