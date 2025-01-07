@@ -32,10 +32,10 @@
 		compatible = "ti,ads1115";
 		reg = <0x48>;
         label = "ADS1115_1";
-		
 		#io-channel-cells = <1>;
         #address-cells = <1>;
         #size-cells = <0>;
+        alert-rdy-gpios = <&gpioa 15 GPIO_ACTIVE_HIGH>;
 
         channel@0 {
             reg = <0>;
@@ -73,6 +73,7 @@
         #io-channel-cells = <1>;
         #address-cells = <1>;
         #size-cells = <0>;
+        alert-rdy-gpios = <&gpioa 10 GPIO_ACTIVE_HIGH>;
 
         channel@0 {
             reg = <0>;
