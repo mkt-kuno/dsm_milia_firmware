@@ -351,11 +351,13 @@ int gp8403_task(void) {
 
 	// Change Value step by step 0 to 10V in 1V steps
 	for (;;) {
+		// @todo 優先度の適切な設定とイベント処理を行う事により
+		// 非ポーリングな処理に変更する
 		for (int ch = 0; ch < 4; ch++) {
 			uint16_t req0 = gp8403_request[2*ch + 0];
 			uint16_t req1 = gp8403_request[2*ch + 1];
 			if (previous_values[2*ch + 0] != req0
-			 || previous_values[2*ch + 1] != req1) {
+			 && previous_values[2*ch + 1] != req1) {
 				ret = gp8403_set_channels(gp8403_adr[ch], req0, req1);
 				previous_values[2*ch + 0] = req0;
 				previous_values[2*ch + 0] = req1;
@@ -364,8 +366,24 @@ int gp8403_task(void) {
 					return ret;
 				}
 			}
+			else if (previous_values[2*ch + 0] != req0) {
+				ret = gp8403_set_channel(gp8403_adr[ch], 0, req0);
+				previous_values[2*ch + 0] = req0;
+				if (ret) {
+					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
+					return ret;
+				}
+			}
+			else if (previous_values[2*ch + 1] != req1) {
+				ret = gp8403_set_channel(gp8403_adr[ch], 1, req1);
+				previous_values[2*ch + 1] = req1;
+				if (ret) {
+					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
+					return ret;
+				}
+			}
 		}
-		k_msleep(1);
+		k_msleep(10);
 	}
 }
 
