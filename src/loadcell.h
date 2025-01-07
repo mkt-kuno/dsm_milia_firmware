@@ -5,7 +5,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gpio.h>
 
-#define LOADCELL_ENABLE_INTERRUPT (0)
+#define LOADCELL_ENABLE_INTERRUPT (1)
 #define LOADCELL_ENABLE_FILTER (1)
 
 #define CONFIG_LOADCELL_CS1237  (0)
@@ -26,6 +26,7 @@ struct LoadCell {
     int32_t previous_value;
     bool is_init;
 #if LOADCELL_ENABLE_INTERRUPT
+    bool is_interrupt_enable;
     struct gpio_callback gpio_cb;
     struct k_event event;
 #endif
@@ -36,7 +37,7 @@ struct LoadCell {
 #endif
 };
 
-void loadcell_setup(struct LoadCell *lc);
+void loadcell_setup(struct LoadCell *lc, bool interrupt_enable);
 void loadcell_loop(struct LoadCell *lc);
 int32_t loadcell_get_raw_value_i32(struct LoadCell *lc);
 int16_t loadcell_get_raw_value(struct LoadCell *lc);

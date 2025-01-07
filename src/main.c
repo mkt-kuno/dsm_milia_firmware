@@ -232,7 +232,7 @@ int ads1115_read_adc_channel(uint8_t unit_id, uint8_t channel_id)
 void ads1115_main(void *param1, void *param2, void *param3)
 {
 	uint32_t key = 0;
-	uint8_t unit_id = (uint8_t)param1;
+	uint8_t unit_id = (uint8_t)((uint32_t)(param1) & 0xFF);
 	if (unit_id > 1) {
 		LOG_ERR("Invalid unit_id %d", unit_id);
 		return;
@@ -253,7 +253,8 @@ void ads1115_main(void *param1, void *param2, void *param3)
 void hx711_main(void *param1, void *param2, void *param3)
 {
 	struct LoadCell *lc = (struct LoadCell *)(param1);
-	loadcell_setup(lc);
+	bool interrupt_enable = (bool)(param2);
+	loadcell_setup(lc, interrupt_enable);
 	loadcell_loop(lc);
 }
 
@@ -369,14 +370,14 @@ int gp8403_test(void) {
 	}
 }
 
-K_THREAD_DEFINE(hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_3, HX711_STACK_SIZE, hx711_main, &hx711_list[3], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_4, HX711_STACK_SIZE, hx711_main, &hx711_list[4], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_5, HX711_STACK_SIZE, hx711_main, &hx711_list[5], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], NULL, NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], NULL, NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], false, NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_3, HX711_STACK_SIZE, hx711_main, &hx711_list[3], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_4, HX711_STACK_SIZE, hx711_main, &hx711_list[4], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_5, HX711_STACK_SIZE, hx711_main, &hx711_list[5], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], true,  NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(ads1115_0, ADS1115_STACK_SIZE, ads1115_main, 0, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(ads1115_1, ADS1115_STACK_SIZE, ads1115_main, 1, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 //K_THREAD_DEFINE(gp8403, GP8403_STACK_SIZE, gp8403_test, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
