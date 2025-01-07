@@ -91,6 +91,11 @@ static int modbus_slave_coil_wr(uint16_t addr, bool state)
 {
 	if (addr > 1) return -ENOTSUP;
 	gpio_pin_set_dt(&led_gpio_dt_spec, (int)state);
+	// @todo Neopixelの制御を追加
+	// addr 0: Neopixel-Red
+	// addr 1: Neopixel-Green
+	// addr 2: Neopixel-Blue
+	// addr 3: MCU Board-LED
 	return 0;
 }
 
@@ -104,7 +109,9 @@ static int modbus_slave_holding_reg_rd(uint16_t addr, uint16_t *reg)
 static int modbus_slave_holding_reg_wr(uint16_t addr, uint16_t reg)
 {
 	if (addr >= ARRAY_SIZE(gp8403_request)) return -ENOTSUP;
-	gp8403_request[addr] = reg;
+	if (reg > 10000) gp8403_request[addr] = 10000;
+	else gp8403_request[addr] = reg;
+	//@todo add task ここにスレッド間処理を追加
 	return 0;
 }
 
@@ -353,6 +360,7 @@ int gp8403_task(void) {
 	for (;;) {
 		// @todo 優先度の適切な設定とイベント処理を行う事により
 		// 非ポーリングな処理に変更する
+		// 具体的にはUSB modbus処理より少し優先度が低ければ良い
 		for (int ch = 0; ch < 4; ch++) {
 			uint16_t req0 = gp8403_request[2*ch + 0];
 			uint16_t req1 = gp8403_request[2*ch + 1];
@@ -360,7 +368,7 @@ int gp8403_task(void) {
 			 && previous_values[2*ch + 1] != req1) {
 				ret = gp8403_set_channels(gp8403_adr[ch], req0, req1);
 				previous_values[2*ch + 0] = req0;
-				previous_values[2*ch + 0] = req1;
+				previous_values[2*ch + 1] = req1;
 				if (ret) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 					return ret;
