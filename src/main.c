@@ -108,13 +108,14 @@ static int modbus_slave_holding_reg_wr(uint16_t addr, uint16_t reg)
 
 static int modbus_slave_input_reg_rd(uint16_t addr, uint16_t *reg)
 {
-	if (addr >= ARRAY_SIZE(input_reg_i16)) return -ENOTSUP;
 	if (addr < 8){
 		// HX711 values
-		*reg = (uint16_t)(((int16_t)(loadcell_get_filtered_value(&hx711_list[addr])/256.0f)) & 0xFFFF);
-	} else {
+		*reg = (uint16_t)(loadcell_get_filtered_value(&hx711_list[addr]) & 0xFFFF);
+	} else  if (addr < 16) {
 		// ADS1115 values
 		*reg = 0x0000;
+	} else {
+		return -ENOTSUP;
 	}
 	return 0;
 }
@@ -156,8 +157,6 @@ static int modbus_slave_init(void)
 
 int main(void)
 {
-	uint32_t dtr = 0;
-
 	gpio_pin_configure_dt(&led_gpio_dt_spec, GPIO_OUTPUT_INACTIVE);
 
 	if (!device_is_ready(modbus_dev) || usb_enable(NULL)) {

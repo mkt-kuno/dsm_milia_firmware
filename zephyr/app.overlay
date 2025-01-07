@@ -108,7 +108,7 @@
 	chosen {
 		zephyr,console = &usart1;
 	};
-	
+
 	leds {
 		compatible = "gpio-leds";
 		myled0: led_0 {
@@ -118,25 +118,25 @@
 
 	hx711_dout: hx711_dout { 
 		compatible = "gpio-loadcell";
-		gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>,
-				<&gpioa 6 GPIO_ACTIVE_HIGH>,
-				<&gpioa 4 GPIO_ACTIVE_HIGH>,
-				<&gpioa 2 GPIO_ACTIVE_HIGH>,
-				<&gpioa 9 GPIO_ACTIVE_HIGH>,
-				<&gpiob 5 GPIO_ACTIVE_HIGH>,
-				<&gpiob 13 GPIO_ACTIVE_HIGH>,
-				<&gpiob 15 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpioa 0  GPIO_ACTIVE_HIGH>,
+				<&gpioa 2  GPIO_ACTIVE_HIGH>,
+				<&gpioa 4  GPIO_ACTIVE_HIGH>,
+				<&gpioa 6  GPIO_ACTIVE_HIGH>,
+				<&gpiob 0  GPIO_ACTIVE_HIGH>,
+				<&gpiob 12 GPIO_ACTIVE_HIGH>,
+				<&gpiob 14 GPIO_ACTIVE_HIGH>,
+				<&gpioa 8  GPIO_ACTIVE_HIGH>;
 	};
 
 	hx711_sck: hx711_sck { 
 		compatible = "gpio-loadcell";
-		gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>,
-				<&gpioa 7 GPIO_ACTIVE_HIGH>,
-				<&gpioa 5 GPIO_ACTIVE_HIGH>,
-				<&gpioa 3 GPIO_ACTIVE_HIGH>,
-				<&gpioa 8 GPIO_ACTIVE_HIGH>,
-				<&gpiob 4 GPIO_ACTIVE_HIGH>,
-				<&gpiob 12 GPIO_ACTIVE_HIGH>,
-				<&gpiob 14 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpioa 1  GPIO_ACTIVE_HIGH>,
+				<&gpioa 3  GPIO_ACTIVE_HIGH>,
+				<&gpioa 5  GPIO_ACTIVE_HIGH>,
+				<&gpioa 7  GPIO_ACTIVE_HIGH>,
+				<&gpiob 1  GPIO_ACTIVE_HIGH>,
+				<&gpiob 13 GPIO_ACTIVE_HIGH>,
+				<&gpiob 15 GPIO_ACTIVE_HIGH>,
+				<&gpioa 9  GPIO_ACTIVE_HIGH>;
 	};
 };

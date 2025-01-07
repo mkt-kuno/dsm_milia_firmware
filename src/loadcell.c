@@ -58,7 +58,7 @@ int16_t loadcell_get_raw_value(struct LoadCell *lc) {
     return (int16_t)((ret >> 8) & 0x0000FFFF);
 }
 
-float loadcell_get_filtered_value(struct LoadCell *lc) {
+int16_t loadcell_get_filtered_value(struct LoadCell *lc) {
 	float ret = 0.0f;
 	uint32_t key = irq_lock();
 	{
@@ -85,7 +85,7 @@ void loadcell_setup(struct LoadCell *lc) {
 #endif
 	// init gpio
     gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
-    gpio_pin_configure_dt(&lc->sck, GPIO_OUTPUT);
+    gpio_pin_configure_dt(&lc->sck, GPIO_OUTPUT | GPIO_PULL_UP);
 
 #if LOADCELL_ENABLE_INTERRUPT
 	k_event_init(&lc->event);
@@ -95,7 +95,12 @@ void loadcell_setup(struct LoadCell *lc) {
     // Reset and power down
     gpio_pin_set_dt(&lc->sck, 0);
     gpio_pin_set_dt(&lc->sck, 1);
+#if CONFIG_LOADCELL_CS1237
     k_msleep(100);
+#endif
+#if CONFIG_LOADCELL_HX711
+	k_usleep(100);
+#endif
     gpio_pin_set_dt(&lc->sck, 0);
 
     // Wait for waking up
@@ -132,7 +137,15 @@ void loadcell_loop(struct LoadCell *lc) {
 		key = irq_lock();
 		{
 			val = loadcell_get_24bit_data(lc);
+#if CONFIG_LOADCELL_HX711
+			// 25bit (ch A gain 128)
+			// 26bit (ch B gain 32)
+			// 27bit (ch A gain 64)
 
+			// set ch A gain 128
+			loadcell_onebit_in(lc);
+#endif
+#if CONFIG_LOADCELL_CS1237
 			// Set Mode "same as HX711 protocol"
 			// keep HIGH, if data is not READY
 			// bit: 25-27
@@ -185,11 +198,13 @@ void loadcell_loop(struct LoadCell *lc) {
 				
 				lc->is_init = true;
 			}
+#endif
 			lc->previous_value = val;
 		}
 		irq_unlock(key);
-
+#if LOADCELL_ENABLE_INTERRUPT
 		gpio_pin_interrupt_configure_dt(&lc->dout, GPIO_INT_EDGE_TO_INACTIVE);
+#endif
 #if !LOADCELL_ENABLE_INTERRUPT
 		k_usleep(wait_next_us);
 #endif
@@ -197,11 +212,11 @@ void loadcell_loop(struct LoadCell *lc) {
 		// filter
 		lc->filter_buf[lc->p_filter_buf] = val;
 		lc->p_filter_buf = (lc->p_filter_buf + 1) % SMA;
-		int32_t _out = 0;
-		for (int i = 0; i < SMA; i++) _out += lc->filter_buf[i];
+		int32_t _sum = 0;
+		for (int i = 0; i < SMA; i++) _sum += lc->filter_buf[i];
 		key = irq_lock();
 		{
-			lc->filtered_value = _out /= (float)SMA;
+			lc->filtered_value = (((_sum/SMA) >> 8) & 0x0000FFFF);;
 		}
 		irq_unlock(key);
 #endif
