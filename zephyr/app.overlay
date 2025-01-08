@@ -112,7 +112,10 @@
 
 	leds {
 		compatible = "gpio-leds";
-		myled0: led_0 {
+        ws2812: ws2812 {
+            gpios = <&gpiob 5 GPIO_ACTIVE_HIGH>;
+        };
+        mculed: mculed {
 			gpios = <&gpioc 13 GPIO_ACTIVE_LOW>;
 		};
     };
