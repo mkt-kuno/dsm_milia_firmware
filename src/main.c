@@ -85,7 +85,9 @@ static const struct device *const ads1115_dev[] = {
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_2)),
 };
 
-static uint8_t pixel_grb[] = {0x00, 0x00, 0x00};
+#define NEOPIXEL_ON (0x7F)
+#define NEOPIXEL_OFF (0x00)
+static uint8_t pixel_grb[] = {NEOPIXEL_OFF, NEOPIXEL_OFF, NEOPIXEL_OFF};
 
 void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
@@ -111,11 +113,11 @@ static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 	// addr 0-3: Neopixel
 	// addr 1: MCU Board-LED
 	if (addr == 0) {
-		*state = pixel_grb[1] == 0xFF;
+		*state = pixel_grb[1] == NEOPIXEL_ON;
 	} else if (addr == 1) {
-		*state = pixel_grb[0] == 0xFF;
+		*state = pixel_grb[0] == NEOPIXEL_ON;
 	} else if (addr == 2) {
-		*state = pixel_grb[2] == 0xFF;
+		*state = pixel_grb[2] == NEOPIXEL_ON;
 	} else if (addr == 3) {
 		*state = gpio_pin_get_dt(&mculed_gpio_dt_spec);
 	}
@@ -130,11 +132,11 @@ static int modbus_slave_coil_wr(uint16_t addr, bool state)
 	// addr 2: Neopixel-Blue
 	// addr 3: MCU Board-LED
 	if (addr == 0) {
-		pixel_grb[1] = state ? 0xFF : 0x00;
+		pixel_grb[1] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
 	} else if (addr == 1) {
-		pixel_grb[0] = state ? 0xFF : 0x00;
+		pixel_grb[0] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
 	} else if (addr == 2) {
-		pixel_grb[2] = state ? 0xFF : 0x00;
+		pixel_grb[2] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
 	} else if (addr == 3) {
 		gpio_pin_set_dt(&mculed_gpio_dt_spec, state);
 	}
