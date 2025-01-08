@@ -85,7 +85,7 @@ static const struct device *const ads1115_dev[] = {
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_2)),
 };
 
-#define NEOPIXEL_ON (0x7F)
+#define NEOPIXEL_ON (0x40)
 #define NEOPIXEL_OFF (0x00)
 static uint8_t pixel_grb[] = {NEOPIXEL_OFF, NEOPIXEL_OFF, NEOPIXEL_OFF};
 
