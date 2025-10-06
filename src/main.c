@@ -78,20 +78,14 @@ static struct LoadCell hx711_list[] = {
 static const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
 static const struct device *const modbus_dev = DEVICE_DT_GET(DT_PARENT(MODBUS_NODE));
 static const struct gpio_dt_spec mculed_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_NODELABEL(mculed), gpios);
-static const struct gpio_dt_spec ws28012_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_NODELABEL(ws2812), gpios);
 
 static const struct device *const ads1115_dev[] = {
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_1)),
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_2)),
 };
 
-#define NEOPIXEL_ON (0x40)
-#define NEOPIXEL_OFF (0x00)
-static uint8_t pixel_grb[] = {NEOPIXEL_OFF, NEOPIXEL_OFF, NEOPIXEL_OFF};
-
 void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
-void wb2812_main(void *param1, void *param2, void *param3);
 void ads1115_main(void *param1, void *param2, void *param3);
 
 K_THREAD_DEFINE(tid_hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], false, NULL, HX711_PRIORITY, 0, 0);
@@ -105,20 +99,12 @@ K_THREAD_DEFINE(tid_hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], true,
 K_THREAD_DEFINE(tid_ads1115_0, ADS1115_STACK_SIZE, ads1115_main, 0, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_ads1115_1, ADS1115_STACK_SIZE, ads1115_main, 1, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_gp8403, GP8403_STACK_SIZE, gp8403_main, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_wb2812, NEOPIXEL_STACK_SIZE, wb2812_main, NULL, NULL, NULL, NEOPIXEL_PRIORITY, 0, 0);
 
 static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 {
 	if (addr > 1) return -ENOTSUP;
-	// addr 0-3: Neopixel
-	// addr 1: MCU Board-LED
+	// addr 0: MCU Board-LED
 	if (addr == 0) {
-		*state = pixel_grb[1] == NEOPIXEL_ON;
-	} else if (addr == 1) {
-		*state = pixel_grb[0] == NEOPIXEL_ON;
-	} else if (addr == 2) {
-		*state = pixel_grb[2] == NEOPIXEL_ON;
-	} else if (addr == 3) {
 		*state = gpio_pin_get_dt(&mculed_gpio_dt_spec);
 	}
 	return 0;
@@ -127,17 +113,8 @@ static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 static int modbus_slave_coil_wr(uint16_t addr, bool state)
 {
 	if (addr > 3) return -ENOTSUP;
-	// addr 0: Neopixel-Red
-	// addr 1: Neopixel-Green
-	// addr 2: Neopixel-Blue
-	// addr 3: MCU Board-LED
+	// addr 0: MCU Board-LED
 	if (addr == 0) {
-		pixel_grb[1] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
-	} else if (addr == 1) {
-		pixel_grb[0] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
-	} else if (addr == 2) {
-		pixel_grb[2] = state ? NEOPIXEL_ON : NEOPIXEL_OFF;
-	} else if (addr == 3) {
 		gpio_pin_set_dt(&mculed_gpio_dt_spec, state);
 	}
 	return 0;
@@ -298,69 +275,6 @@ void ads1115_main(void *param1, void *param2, void *param3)
 			}
 			irq_unlock(key);
 		}
-	}
-}
-
-// @note
-// STM32F411 100Mhz動作の場合のみ正常に動作します
-// その他の動作周波数の場合は適宜調整が必要です
-// またZephyrのGPIOドライバの仕様により、動作しなくなるおそれがあります
-// その場合は、GPIOドライバの仕様を確認し、オシロスコープでタイミングを計測しながら
-// 適宜nopを修正してください
-static void ws2812b_t(bool is_high){
-	gpio_pin_set_raw(ws28012_gpio_dt_spec.port, ws28012_gpio_dt_spec.pin, true);
-	__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-	if (is_high) {
-		__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-		__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-		__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-		__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-		__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");__asm__("nop");
-	}
-	gpio_pin_set_raw(ws28012_gpio_dt_spec.port, ws28012_gpio_dt_spec.pin, false);
-	gpio_pin_set_raw(ws28012_gpio_dt_spec.port, ws28012_gpio_dt_spec.pin, false);
-};
-static void rst(void){
-	gpio_pin_set_raw(ws28012_gpio_dt_spec.port, ws28012_gpio_dt_spec.pin, false);
-	gpio_pin_set_raw(ws28012_gpio_dt_spec.port, ws28012_gpio_dt_spec.pin, false);
-};
-
-void wb2812_main(void *param1, void *param2, void *param3) {
-	gpio_pin_configure_dt(&ws28012_gpio_dt_spec, GPIO_OUTPUT_INACTIVE);
-	gpio_pin_set_dt(&ws28012_gpio_dt_spec, false);
-
-	while (1) {
-		uint32_t key = 0;
-		key = irq_lock();
-		{
-			ws2812b_t((pixel_grb[0] & 0x80));
-			ws2812b_t((pixel_grb[0] & 0x40));
-			ws2812b_t((pixel_grb[0] & 0x20));
-			ws2812b_t((pixel_grb[0] & 0x10));
-			ws2812b_t((pixel_grb[0] & 0x08));
-			ws2812b_t((pixel_grb[0] & 0x04));
-			ws2812b_t((pixel_grb[0] & 0x02));
-			ws2812b_t((pixel_grb[0] & 0x01));
-			ws2812b_t((pixel_grb[1] & 0x80));
-			ws2812b_t((pixel_grb[1] & 0x40));
-			ws2812b_t((pixel_grb[1] & 0x20));
-			ws2812b_t((pixel_grb[1] & 0x10));
-			ws2812b_t((pixel_grb[1] & 0x08));
-			ws2812b_t((pixel_grb[1] & 0x04));
-			ws2812b_t((pixel_grb[1] & 0x02));
-			ws2812b_t((pixel_grb[1] & 0x01));
-			ws2812b_t((pixel_grb[2] & 0x80));
-			ws2812b_t((pixel_grb[2] & 0x40));
-			ws2812b_t((pixel_grb[2] & 0x20));
-			ws2812b_t((pixel_grb[2] & 0x10));
-			ws2812b_t((pixel_grb[2] & 0x08));
-			ws2812b_t((pixel_grb[2] & 0x04));
-			ws2812b_t((pixel_grb[2] & 0x02));
-			ws2812b_t((pixel_grb[2] & 0x01));
-			rst();
-		}
-		irq_unlock(key);
-		k_msleep(100);
 	}
 }
 
