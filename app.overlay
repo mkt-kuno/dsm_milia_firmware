@@ -14,7 +14,12 @@
 		};
 	};
 };
-
+/*
+ * Copyright (c) 2024 DNDG srl
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+ 
 &usart1 {
 	pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;
 	pinctrl-names = "default";
