@@ -28,8 +28,6 @@ LOG_MODULE_REGISTER(main);
 #define ADS1115_PRIORITY 		(USB_WORKQUEUE_PRIORITY-1)
 #define GP8403_STACK_SIZE 		(1024)
 #define GP8403_PRIORITY 		(USB_WORKQUEUE_PRIORITY+1)
-#define NEOPIXEL_STACK_SIZE 	(512)
-#define NEOPIXEL_PRIORITY 		(USB_WORKQUEUE_PRIORITY+2)
 
 #define ADS1115_RESOLUTION 15 // ADS1115は16ビットの解像度だが差動じゃないので15ビット指定が必要
 #define ADS1115_GAIN ADC_GAIN_1_3
@@ -75,9 +73,9 @@ static struct LoadCell hx711_list[] = {
 };
 
 #define MODBUS_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_modbus_serial)
-static const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
+static const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
 static const struct device *const modbus_dev = DEVICE_DT_GET(DT_PARENT(MODBUS_NODE));
-static const struct gpio_dt_spec mculed_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_NODELABEL(mculed), gpios);
+static const struct gpio_dt_spec mculed_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_NODELABEL(led0), gpios);
 
 static const struct device *const ads1115_dev[] = {
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_1)),
@@ -102,7 +100,7 @@ K_THREAD_DEFINE(tid_gp8403, GP8403_STACK_SIZE, gp8403_main, NULL, NULL, NULL, GP
 
 static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 {
-	if (addr > 1) return -ENOTSUP;
+	if (addr > 0) return -ENOTSUP;
 	// addr 0: MCU Board-LED
 	if (addr == 0) {
 		*state = gpio_pin_get_dt(&mculed_gpio_dt_spec);
@@ -112,7 +110,7 @@ static int modbus_slave_coil_rd(uint16_t addr, bool *state)
 
 static int modbus_slave_coil_wr(uint16_t addr, bool state)
 {
-	if (addr > 3) return -ENOTSUP;
+	if (addr > 0) return -ENOTSUP;
 	// addr 0: MCU Board-LED
 	if (addr == 0) {
 		gpio_pin_set_dt(&mculed_gpio_dt_spec, state);
