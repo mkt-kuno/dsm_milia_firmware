@@ -16,6 +16,16 @@
 };
  
 &pinctrl {
+    uart0_userdef: uart0_userdef {
+		group1 {
+			pinmux = <UART0_TX_P16>;
+		};
+		group2 {
+			pinmux = <UART0_RX_P17>;
+			input-enable;
+		};
+	};
+
     i2c0_userdef: i2c0_userdef {
 		group1 {
 			pinmux = <I2C0_SDA_P20>, <I2C0_SCL_P21>;
@@ -23,6 +33,13 @@
 			input-schmitt-enable;
 		};
 	};
+};
+
+&uart0 {
+	current-speed = <921600>;
+	status = "okay";
+	pinctrl-0 = <&uart0_userdef>;
+	pinctrl-names = "default";
 };
 
 &i2c0 {
@@ -109,6 +126,10 @@
 };
 
 / {
+    chosen {
+        zephyr,console = &uart0;
+    };
+
 	hx711_dout: hx711_dout { 
 		compatible = "gpio-loadcell";
 		gpios = <&gpio0 0  GPIO_ACTIVE_HIGH>,

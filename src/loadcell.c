@@ -65,7 +65,7 @@ int16_t loadcell_get_filtered_value(struct LoadCell *lc) {
 #if LOADCELL_ENABLE_FILTER
 		ret = lc->filtered_value;
 #else
-		ret = (float)lc->previous_value;
+		ret = lc->previous_value;
 #endif
 	}
 	irq_unlock(key);
@@ -132,7 +132,7 @@ void loadcell_loop(struct LoadCell *lc) {
 	uint32_t key = 0;
 
 	const int32_t wait_bit_us = 10 * 1000 / CONFIG_LOADCELL_FREQ;
-	const int32_t wait_next_us = 900 * 1000 / CONFIG_LOADCELL_FREQ;
+	const int32_t wait_next_us = 700 * 1000 / CONFIG_LOADCELL_FREQ;
 
 	while(true) {
 #if LOADCELL_ENABLE_INTERRUPT

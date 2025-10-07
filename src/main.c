@@ -21,17 +21,17 @@
 
 LOG_MODULE_REGISTER(main);
 
-#define USB_WORKQUEUE_PRIORITY 	(0)
-#define HX711_STACK_SIZE 		(512)
-#define HX711_PRIORITY 			(USB_WORKQUEUE_PRIORITY-1)
-#define ADS1115_STACK_SIZE 		(1024)
-#define ADS1115_PRIORITY 		(USB_WORKQUEUE_PRIORITY-1)
-#define GP8403_STACK_SIZE 		(1024)
-#define GP8403_PRIORITY 		(USB_WORKQUEUE_PRIORITY+1)
+#define USB_WORKQUEUE_PRIORITY 	(-2)
+#define HX711_STACK_SIZE 		(384)
+#define HX711_PRIORITY 			(USB_WORKQUEUE_PRIORITY+2)
+#define ADS1115_STACK_SIZE 		(512)
+#define ADS1115_PRIORITY 		(USB_WORKQUEUE_PRIORITY+2)
+#define GP8403_STACK_SIZE 		(512)
+#define GP8403_PRIORITY 		(USB_WORKQUEUE_PRIORITY+3)
 
-#define ADS1115_RESOLUTION 15 // ADS1115は16ビットの解像度だが差動じゃないので15ビット指定が必要
-#define ADS1115_GAIN ADC_GAIN_1_3
-#define ADS1115_REFERENCE ADC_REF_INTERNAL
+#define ADS1115_RESOLUTION 	15 // ADS1115は16ビットの解像度だが差動じゃないので15ビット指定が必要
+#define ADS1115_GAIN 		ADC_GAIN_1_3
+#define ADS1115_REFERENCE 	ADC_REF_INTERNAL
 #define ADS1115_ACQUISITION_TIME ADC_ACQ_TIME(ADC_ACQ_TIME_TICKS, 4)
 
 static uint16_t gp8403_request[8];
@@ -86,7 +86,7 @@ void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
 void ads1115_main(void *param1, void *param2, void *param3);
 
-K_THREAD_DEFINE(tid_hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], false, NULL, HX711_PRIORITY, 0, 0);
+K_THREAD_DEFINE(tid_hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_hx711_3, HX711_STACK_SIZE, hx711_main, &hx711_list[3], true,  NULL, HX711_PRIORITY, 0, 0);
@@ -138,7 +138,26 @@ static int modbus_slave_input_reg_rd(uint16_t addr, uint16_t *reg)
 {
 	if (addr < 8){
 		// HX711 values
-		*reg = (uint16_t)(loadcell_get_filtered_value(&hx711_list[addr]) & 0xFFFF);
+		*reg = (uint16_t)(loadcell_get_raw_value(&hx711_list[addr]) & 0xFFFF);
+	} else  if (addr < 16) {
+		// ADS1115 values
+		uint32_t key = 0;
+		key = irq_lock();
+		{
+			*reg = ads1115_result[addr - 8];
+		}
+		irq_unlock(key);
+	} else {
+		return -ENOTSUP;
+	}
+	return 0;
+}
+
+static int modbus_slave_input_reg_rd_fp(uint16_t addr, float *reg)
+{
+	if (addr < 8){
+		// HX711 values
+		*reg = loadcell_get_raw_value_i32(&hx711_list[addr]);
 	} else  if (addr < 16) {
 		// ADS1115 values
 		uint32_t key = 0;
@@ -159,6 +178,7 @@ static struct modbus_user_callbacks modbus_slave_user_callbacks = {
 	.holding_reg_rd = modbus_slave_holding_reg_rd,
 	.holding_reg_wr = modbus_slave_holding_reg_wr,
 	.input_reg_rd = modbus_slave_input_reg_rd,
+	.input_reg_rd_fp = modbus_slave_input_reg_rd_fp,
 };
 
 const static struct modbus_iface_param modbus_slave_if_param = {

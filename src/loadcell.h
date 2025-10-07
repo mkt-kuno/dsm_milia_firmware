@@ -6,12 +6,12 @@
 #include <zephyr/drivers/gpio.h>
 
 #define LOADCELL_ENABLE_INTERRUPT (1)
-#define LOADCELL_ENABLE_FILTER (1)
+#define LOADCELL_ENABLE_FILTER (0)
 
 #define CONFIG_LOADCELL_CS1237  (0)
 #define CONFIG_LOADCELL_HX711   (1)
 
-#define CONFIG_LOADCELL_FREQ 	(80)
+#define CONFIG_LOADCELL_FREQ 	(10)
 #ifndef CONFIG_LOADCELL_FREQ
 #define CONFIG_LOADCELL_FREQ 	(10)
 #endif
