@@ -132,7 +132,7 @@ void loadcell_loop(struct LoadCell *lc) {
 	uint32_t key = 0;
 
 	const int32_t wait_bit_us = 10 * 1000 / CONFIG_LOADCELL_FREQ;
-	const int32_t wait_next_us = 700 * 1000 / CONFIG_LOADCELL_FREQ;
+	const int32_t wait_next_us = 800 * 1000 / CONFIG_LOADCELL_FREQ;
 
 	while(true) {
 #if LOADCELL_ENABLE_INTERRUPT

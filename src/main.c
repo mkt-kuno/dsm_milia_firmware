@@ -144,7 +144,7 @@ static int modbus_slave_input_reg_rd(uint16_t addr, uint16_t *reg)
 		uint32_t key = 0;
 		key = irq_lock();
 		{
-			*reg = ads1115_result[addr - 8];
+			*reg = (uint16_t)(ads1115_result[addr - 8] & 0xFFFF);
 		}
 		irq_unlock(key);
 	} else {
@@ -258,7 +258,7 @@ static struct adc_sequence ads1115_sequence[2] = {
 	}
 };
 
-int ads1115_read_adc_channel(uint8_t unit_id, uint8_t channel_id)
+int16_t ads1115_read_adc_channel(uint8_t unit_id, uint8_t channel_id)
 {
 	ads1115_channel_cfg[unit_id].input_positive = channel_id;
 	const struct device *const dev = ads1115_dev[unit_id];
@@ -286,7 +286,7 @@ void ads1115_main(void *param1, void *param2, void *param3)
 
 	while (1) {
 		for (int channel = 0; channel < 4; channel++) {
-			int value = ads1115_read_adc_channel(unit_id, channel);
+			int16_t value = ads1115_read_adc_channel(unit_id, channel);
 			key = irq_lock();
 			{
 				ads1115_result[unit_id * 4 + channel] = value;
@@ -300,8 +300,8 @@ void hx711_main(void *param1, void *param2, void *param3)
 {
 	struct LoadCell *lc = (struct LoadCell *)(param1);
 	bool interrupt_enable = (bool)(param2);
-	loadcell_setup(lc, interrupt_enable);
-	loadcell_loop(lc);
+	loadcell_setup(lc, );
+	loadcell_loop(lc);interrupt_enable
 }
 
 int gp8403_init(uint8_t adr) {
@@ -393,9 +393,10 @@ void gp8403_main(void *param1, void *param2, void *param3) {
 		}
 	}
 
-	// Change Value step by step 0 to 10V in 1V steps
+	// Change Value
 	for (;;) {
 		for (int ch = 0; ch < 4; ch++) {
+			// Change DAC outputs, both channels
 			uint16_t req0 = gp8403_request[2*ch + 0];
 			uint16_t req1 = gp8403_request[2*ch + 1];
 			if (previous_values[2*ch + 0] != req0
@@ -407,6 +408,7 @@ void gp8403_main(void *param1, void *param2, void *param3) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 				}
 			}
+			// Change DAC output only for channel 0
 			else if (previous_values[2*ch + 0] != req0) {
 				ret = gp8403_set_channel(gp8403_adr[ch], 0, req0);
 				previous_values[2*ch + 0] = req0;
@@ -414,6 +416,7 @@ void gp8403_main(void *param1, void *param2, void *param3) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 				}
 			}
+			// Change DAC output only for channel 1
 			else if (previous_values[2*ch + 1] != req1) {
 				ret = gp8403_set_channel(gp8403_adr[ch], 1, req1);
 				previous_values[2*ch + 1] = req1;
