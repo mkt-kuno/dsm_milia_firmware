@@ -34,8 +34,9 @@ LOG_MODULE_REGISTER(main);
 #define ADS1115_REFERENCE 	ADC_REF_INTERNAL
 #define ADS1115_ACQUISITION_TIME ADC_ACQ_TIME(ADC_ACQ_TIME_TICKS, 4)
 
-static uint16_t gp8403_request[8];
+#define GP8403_MAX_CH	8
 static int16_t ads1115_result[8];
+static uint16_t gp8403_values[8] = {0};
 
 static struct LoadCell hx711_list[] = {
 	{
@@ -82,6 +83,14 @@ static const struct device *const ads1115_dev[] = {
 	DEVICE_DT_GET(DT_NODELABEL(ads1115_2)),
 };
 
+typedef struct gp8403_message {
+	uint16_t channel; // 0~7
+	uint16_t value; // 0~10000
+} gp8403_msg_t;
+#define GP8403_MSG_BUF_SIZE (GP8403_MAX_CH*2)
+gp8403_msg_t gp8403_msg_buffer[GP8403_MSG_BUF_SIZE];
+struct k_msgq gp8403_msgq;
+
 void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
 void ads1115_main(void *param1, void *param2, void *param3);
@@ -120,17 +129,29 @@ static int modbus_slave_coil_wr(uint16_t addr, bool state)
 
 static int modbus_slave_holding_reg_rd(uint16_t addr, uint16_t *reg)
 {
-	if (addr >= ARRAY_SIZE(gp8403_request)) return -ENOTSUP;
-	*reg = gp8403_request[addr];
+	if (addr >= GP8403_MAX_CH) return -ENOTSUP;
+	uint32_t key = 0;
+	key = irq_lock();
+	{
+		*reg = gp8403_values[addr];
+	}
+	irq_unlock(key);
 	return 0;
 }
 
 static int modbus_slave_holding_reg_wr(uint16_t addr, uint16_t reg)
 {
-	if (addr >= ARRAY_SIZE(gp8403_request)) return -ENOTSUP;
-	if (reg > 10000) gp8403_request[addr] = 10000;
-	else gp8403_request[addr] = reg;
-	k_wakeup(tid_gp8403);
+	if (addr >= GP8403_MAX_CH) return -ENOTSUP;
+	if (reg > 10000) reg = 10000;
+
+	gp8403_msg_t send_data = {0};
+	send_data.channel = addr;
+	send_data.value = reg;
+
+	int ret = k_msgq_put(&gp8403_msgq, &send_data, K_NO_WAIT);
+	if (ret) {
+		LOG_ERR("GP8403 msgq full");
+	}
 	return 0;
 }
 
@@ -211,6 +232,8 @@ static int modbus_slave_init(void)
 int main(void)
 {
 	gpio_pin_configure_dt(&mculed_gpio_dt_spec, GPIO_OUTPUT_INACTIVE);
+
+	k_msgq_init(&gp8403_msgq, (char *)gp8403_msg_buffer, sizeof(gp8403_msg_t), GP8403_MSG_BUF_SIZE);
 
 	if (!device_is_ready(modbus_dev) || usb_enable(NULL)) {
 		return 0;
@@ -300,8 +323,8 @@ void hx711_main(void *param1, void *param2, void *param3)
 {
 	struct LoadCell *lc = (struct LoadCell *)(param1);
 	bool interrupt_enable = (bool)(param2);
-	loadcell_setup(lc, );
-	loadcell_loop(lc);interrupt_enable
+	loadcell_setup(lc, interrupt_enable);
+	loadcell_loop(lc);
 }
 
 int gp8403_init(uint8_t adr) {
@@ -376,13 +399,12 @@ int gp8403_set_channels(uint8_t address, uint16_t data_0, uint16_t data_1) {
 
 void gp8403_main(void *param1, void *param2, void *param3) {
 	const uint8_t gp8403_adr[] = {0x58, 0x59, 0x5A, 0x5B};
-	uint16_t previous_values[8] = {0};
 	int ret = 0;
 
 	// set GP8403 output range to 0-10V
 	for (int ch = 0; ch < 4; ch++) {
-		previous_values[2*ch + 0] = 0;
-		previous_values[2*ch + 1] = 0;
+		gp8403_values[2*ch + 0] = 0;
+		gp8403_values[2*ch + 1] = 0;
 		ret = gp8403_init(gp8403_adr[ch]);
 		if (ret) {
 			LOG_ERR("Failed to init GP8403 adrs:0x%2d", gp8403_adr[ch]);
@@ -394,39 +416,52 @@ void gp8403_main(void *param1, void *param2, void *param3) {
 	}
 
 	// Change Value
+	uint16_t gp8403_request[8] = {0};
 	for (;;) {
+		gp8403_msg_t recv_data;
+		// Wait for request
+		k_msgq_get(&gp8403_msgq, &recv_data, K_FOREVER);
+		gp8403_request[recv_data.channel] = recv_data.value;
+		// Get all requests in the queue
+		while (k_msgq_peek(&gp8403_msgq, &recv_data) == 0)
+		{
+			int ret = k_msgq_get(&gp8403_msgq, &recv_data, K_NO_WAIT);
+			if (ret) {
+				LOG_ERR("Failed to get GP8403 msgq");
+				break;
+			}
+			gp8403_request[recv_data.channel] = recv_data.value;
+		}
+
 		for (int ch = 0; ch < 4; ch++) {
 			// Change DAC outputs, both channels
 			uint16_t req0 = gp8403_request[2*ch + 0];
 			uint16_t req1 = gp8403_request[2*ch + 1];
-			if (previous_values[2*ch + 0] != req0
-			 && previous_values[2*ch + 1] != req1) {
+			if (gp8403_values[2*ch + 0] != req0
+			 && gp8403_values[2*ch + 1] != req1) {
 				ret = gp8403_set_channels(gp8403_adr[ch], req0, req1);
-				previous_values[2*ch + 0] = req0;
-				previous_values[2*ch + 1] = req1;
+				gp8403_values[2*ch + 0] = req0;
+				gp8403_values[2*ch + 1] = req1;
 				if (ret) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 				}
 			}
 			// Change DAC output only for channel 0
-			else if (previous_values[2*ch + 0] != req0) {
+			else if (gp8403_values[2*ch + 0] != req0) {
 				ret = gp8403_set_channel(gp8403_adr[ch], 0, req0);
-				previous_values[2*ch + 0] = req0;
+				gp8403_values[2*ch + 0] = req0;
 				if (ret) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 				}
 			}
 			// Change DAC output only for channel 1
-			else if (previous_values[2*ch + 1] != req1) {
+			else if (gp8403_values[2*ch + 1] != req1) {
 				ret = gp8403_set_channel(gp8403_adr[ch], 1, req1);
-				previous_values[2*ch + 1] = req1;
+				gp8403_values[2*ch + 1] = req1;
 				if (ret) {
 					LOG_ERR("Failed to set GP8403 adrs:0x%2d", gp8403_adr[ch]);
 				}
 			}
 		}
-		// 変更があった場合はUSBD->Modbusでの書換時に
-		// k_wakeup(tid_gp8403)で起床させるので10msは待たない
-		k_msleep(10);
 	}
 }
