@@ -95,6 +95,7 @@ void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
 void ads1115_main(void *param1, void *param2, void *param3);
 
+// STM32系では、tid_hx711_0の割り込みをFalseにしてポーリングにすること
 K_THREAD_DEFINE(tid_hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], true,  NULL, HX711_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], true,  NULL, HX711_PRIORITY, 0, 0);
