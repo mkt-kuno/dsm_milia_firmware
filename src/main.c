@@ -176,9 +176,11 @@ static int modbus_slave_input_reg_rd(uint16_t addr, uint16_t *reg)
 
 static int modbus_slave_input_reg_rd_fp(uint16_t addr, float *reg)
 {
+	addr = (addr - 5000)/2;
 	if (addr < 8){
 		// HX711 values
-		*reg = loadcell_get_raw_value_i32(&hx711_list[addr]);
+		int32_t _temp = loadcell_get_raw_value_i32(&hx711_list[addr]);
+		*reg = _temp/256.0f;
 	} else  if (addr < 16) {
 		// ADS1115 values
 		uint32_t key = 0;
