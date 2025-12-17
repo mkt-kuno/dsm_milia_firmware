@@ -1,0 +1,140 @@
+/*
+ * Copyright (c) 2021 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+
+		modbus0 {
+			compatible = "zephyr,modbus-serial";
+			status = "okay";
+		};
+	};
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_pb9>;
+	pinctrl-names = "default";
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+
+	ads1115_1: ads1115@48 {
+		compatible = "ti,ads1115";
+		reg = <0x48>;
+        label = "ADS1115_1";
+		#io-channel-cells = <1>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        alert-rdy-gpios = <&gpioa 15 GPIO_ACTIVE_HIGH>;
+
+        channel@0 {
+            reg = <0>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@1 {
+            reg = <1>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@2 {
+            reg = <2>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@3 {
+            reg = <3>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+	};
+
+	ads1115_2: ads1115@49 {
+        compatible = "ti,ads1115";
+        reg = <0x49>;  // 2つ目のADS1115のI2Cアドレス
+        label = "ADS1115_2";
+        #io-channel-cells = <1>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        alert-rdy-gpios = <&gpioa 10 GPIO_ACTIVE_HIGH>;
+
+        channel@0 {
+            reg = <0>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@1 {
+            reg = <1>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@2 {
+            reg = <2>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+
+        channel@3 {
+            reg = <3>;
+            zephyr,gain = "ADC_GAIN_1_3";
+            zephyr,reference = "ADC_REF_INTERNAL";
+            zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 1)>;
+        };
+    };
+};
+
+/ {
+	aliases {
+		i2c-main = &i2c1;
+	};
+
+	chosen {
+		zephyr,console = &usart1;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+        led0: led0 {
+			gpios = <&gpioc 13 GPIO_ACTIVE_LOW>;
+		};
+    };
+
+	hx711_dout: hx711_dout { 
+		compatible = "gpio-loadcell";
+		gpios = <&gpioa 0  GPIO_ACTIVE_HIGH>,
+				<&gpioa 2  GPIO_ACTIVE_HIGH>,
+				<&gpioa 4  GPIO_ACTIVE_HIGH>,
+				<&gpioa 6  GPIO_ACTIVE_HIGH>,
+				<&gpiob 0  GPIO_ACTIVE_HIGH>,
+				<&gpiob 12 GPIO_ACTIVE_HIGH>,
+				<&gpiob 14 GPIO_ACTIVE_HIGH>,
+				<&gpioa 8  GPIO_ACTIVE_HIGH>;
+	};
+
+	hx711_sck: hx711_sck { 
+		compatible = "gpio-loadcell";
+		gpios = <&gpioa 1  GPIO_ACTIVE_HIGH>,
+				<&gpioa 3  GPIO_ACTIVE_HIGH>,
+				<&gpioa 5  GPIO_ACTIVE_HIGH>,
+				<&gpioa 7  GPIO_ACTIVE_HIGH>,
+				<&gpiob 1  GPIO_ACTIVE_HIGH>,
+				<&gpiob 13 GPIO_ACTIVE_HIGH>,
+				<&gpiob 15 GPIO_ACTIVE_HIGH>,
+				<&gpioa 9  GPIO_ACTIVE_HIGH>;
+	};
+};

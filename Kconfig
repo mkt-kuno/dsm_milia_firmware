@@ -7,3 +7,10 @@
 source "samples/subsys/usb/common/Kconfig.sample_usbd"
 
 source "Kconfig.zephyr"
+
+config LOADCELL_FREQ
+	int "Loadcell sampling frequency (Hz)"
+	default 10
+	help
+	  Sampling frequency for the loadcell in Hz.
+	  Default is 10 Hz for rpi_pico, 80 Hz for blackpill_f411ce.

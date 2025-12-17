@@ -74,7 +74,7 @@ static struct LoadCell hx711_list[] = {
 };
 
 #define MODBUS_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_modbus_serial)
-static const struct device *const i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+static const struct device *const i2c_dev = DEVICE_DT_GET(DT_ALIAS(i2c_main));
 static const struct device *const modbus_dev = DEVICE_DT_GET(DT_PARENT(MODBUS_NODE));
 static const struct gpio_dt_spec mculed_gpio_dt_spec = GPIO_DT_SPEC_GET(DT_NODELABEL(led0), gpios);
 
