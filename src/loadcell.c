@@ -4,14 +4,12 @@
 
 LOG_MODULE_REGISTER(lc);
 
-#if LOADCELL_ENABLE_INTERRUPT
 #define LOADCELL_EVENT (0x0001)
 static void loadcell_dout_ready_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
 	struct LoadCell *lc = CONTAINER_OF(cb, struct LoadCell, gpio_cb);
 	gpio_pin_interrupt_configure_dt(&lc->dout, GPIO_INT_DISABLE);
 	k_event_set(&lc->event, LOADCELL_EVENT);
 }
-#endif
 
 static inline int loadcell_onebit_in(struct LoadCell *lc) {
     int val = 0;
@@ -72,13 +70,12 @@ void loadcell_setup(struct LoadCell *lc) {
     gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
     gpio_pin_configure_dt(&lc->sck, GPIO_OUTPUT | GPIO_PULL_UP);
 
-#if LOADCELL_ENABLE_INTERRUPT
 	if (lc->is_interrupt_enable) {
 		k_event_init(&lc->event);
 		gpio_init_callback(&lc->gpio_cb, loadcell_dout_ready_callback, BIT(lc->dout.pin));
 		gpio_add_callback_dt(&lc->dout, &lc->gpio_cb);
 	}
-#endif
+
     // Reset and power down
     gpio_pin_set_dt(&lc->sck, 0);
     gpio_pin_set_dt(&lc->sck, 1);
@@ -102,11 +99,9 @@ void loadcell_setup(struct LoadCell *lc) {
 		if (--timeout == 0) k_sleep(K_FOREVER);
     }
 
-#if LOADCELL_ENABLE_INTERRUPT
 	if (lc->is_interrupt_enable) {
 		gpio_pin_interrupt_configure_dt(&lc->dout, GPIO_INT_EDGE_TO_ACTIVE);
 	}
-#endif
 }
 
 void loadcell_loop(struct LoadCell *lc) {
@@ -117,16 +112,12 @@ void loadcell_loop(struct LoadCell *lc) {
 	const int32_t wait_next_us = 800 * 1000 / CONFIG_LOADCELL_FREQ;
 
 	while(true) {
-#if LOADCELL_ENABLE_INTERRUPT
 		if (lc->is_interrupt_enable){
 			k_event_wait(&lc->event, LOADCELL_EVENT, true, K_FOREVER);
 		}
 		else {
 			while (gpio_pin_get_dt(&lc->dout) == 1) k_usleep(wait_bit_us);
 		}
-#else
-		while (gpio_pin_get_dt(&lc->dout) == 1) k_usleep(wait_bit_us);
-#endif
 		key = irq_lock();
 		{
 			val = loadcell_get_24bit_data(lc);
@@ -195,16 +186,13 @@ void loadcell_loop(struct LoadCell *lc) {
 			lc->previous_value = val;
 		}
 		irq_unlock(key);
-#if LOADCELL_ENABLE_INTERRUPT
+		
 		if (lc->is_interrupt_enable){
 			gpio_pin_interrupt_configure_dt(&lc->dout, GPIO_INT_EDGE_TO_INACTIVE);
 		} else {
 			k_usleep(wait_next_us);
 		}
-#endif
-#if !LOADCELL_ENABLE_INTERRUPT
-		k_usleep(wait_next_us);
-#endif
+
 #if LOADCELL_ENABLE_FILTER
 		// filter
 		lc->filter_buf[lc->p_filter_buf] = val;

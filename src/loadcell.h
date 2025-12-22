@@ -5,8 +5,6 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gpio.h>
 
-#define LOADCELL_ENABLE_INTERRUPT (1)
-
 #define CONFIG_LOADCELL_CS1237  (0)
 #define CONFIG_LOADCELL_HX711   (1)
 
@@ -23,11 +21,9 @@ struct LoadCell {
     struct gpio_dt_spec sck;
     int32_t previous_value;
     bool is_init;
-#if LOADCELL_ENABLE_INTERRUPT
     bool is_interrupt_enable;
     struct gpio_callback gpio_cb;
     struct k_event event;
-#endif
 #if LOADCELL_ENABLE_FILTER
     int32_t filtered_value;
     int32_t filter_buf[SMA];
