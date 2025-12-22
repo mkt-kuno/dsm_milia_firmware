@@ -14,3 +14,9 @@ config LOADCELL_FREQ
 	help
 	  Sampling frequency for the loadcell in Hz.
 	  Default is 10 Hz for rpi_pico, 80 Hz for blackpill_f411ce.
+
+config LOADCELL_ENABLE_FILTER
+    bool "Enable loadcell filter"
+    default n
+    help
+      Enable fixed-point loadcell filtering and 10 Hz decimation.

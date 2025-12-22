@@ -1,8 +1,169 @@
 #include "loadcell.h"
 
+#include <limits.h>
+#include <string.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(lc);
+
+#if LOADCELL_ENABLE_FILTER
+#define LOADCELL_MAX_CHANNELS 8
+#define LOADCELL_DECIM_FACTOR 8
+#define LOADCELL_SOS_COUNT 5
+
+struct lc_sos {
+	int32_t b0;
+	int32_t b1;
+	int32_t b2;
+	int32_t a1;
+	int32_t a2;
+};
+
+struct lc_sos_state {
+	int32_t z1;
+	int32_t z2;
+};
+
+struct lc_filter_state {
+	struct lc_sos_state sos[LOADCELL_SOS_COUNT];
+	uint8_t decim_count;
+	int32_t last_output;
+};
+
+static struct lc_filter_state lc_filter_states[LOADCELL_MAX_CHANNELS];
+static const struct LoadCell *lc_filter_owner[LOADCELL_MAX_CHANNELS];
+
+static inline int32_t sat32(int64_t x)
+{
+	if (x > INT32_MAX) {
+		return INT32_MAX;
+	}
+	if (x < INT32_MIN) {
+		return INT32_MIN;
+	}
+	return (int32_t)x;
+}
+
+static inline int32_t q31_mul(int32_t a, int32_t b)
+{
+	int64_t prod = (int64_t)a * (int64_t)b;
+
+	prod += (prod >= 0) ? (1LL << 30) : -(1LL << 30);
+	return (int32_t)(prod >> 31);
+}
+
+static inline int32_t sos_df2t(const struct lc_sos *c, struct lc_sos_state *s, int32_t x)
+{
+	int64_t acc = (int64_t)q31_mul(c->b0, x) + s->z1;
+	int32_t y = sat32(acc);
+	int64_t z1 = (int64_t)q31_mul(c->b1, x) + s->z2 - (int64_t)q31_mul(c->a1, y);
+	int64_t z2 = (int64_t)q31_mul(c->b2, x) - (int64_t)q31_mul(c->a2, y);
+
+	s->z1 = sat32(z1);
+	s->z2 = sat32(z2);
+	return y;
+}
+
+/*
+ * IIR pipeline (Fs = 80 Hz, Q31, DF2T):
+ * - Notches at 20 Hz and 30 Hz to suppress 60/50 Hz aliases after sampling.
+ * - Low-pass is a conservative 3x one-pole cascade at 3.2 Hz to keep |a1| < 1 in Q31.
+ *   Replace the last 3 sections with an offline-designed SOS (ellip/cheby2/butter) if
+ *   sharper stopband rejection is required.
+ *
+ * Example (Python/scipy) for elliptic SOS generation and Q31 conversion:
+ *   sos = signal.ellip(6, 1, 70, 3.2, 'low', fs=80, output='sos')
+ *   q31 = np.round(sos[:, :3] * 2**31).astype(np.int64)
+ *   # a0 is 1; use a1/a2 from sos[:, 4:6] and convert to Q31 the same way.
+ */
+static const struct lc_sos lc_sos_coeffs[LOADCELL_SOS_COUNT] = {
+	/* Notch @20 Hz, Q=0.8 (wide to tolerate drift, fits Q31 range). */
+	{ 1321528399, 0, 1321528399, 0, 495573150 },
+	/* Notch @30 Hz, Q=0.8 (wide to tolerate drift, fits Q31 range). */
+	{ 1489299873, 2106188079, 1489299873, 2106188079, 831116099 },
+	/* Low-pass 1-pole @3.2 Hz (section 1/3). */
+	{ 477240275, 0, 0, -1670243373, 0 },
+	/* Low-pass 1-pole @3.2 Hz (section 2/3). */
+	{ 477240275, 0, 0, -1670243373, 0 },
+	/* Low-pass 1-pole @3.2 Hz (section 3/3). */
+	{ 477240275, 0, 0, -1670243373, 0 },
+};
+
+static struct lc_filter_state *loadcell_filter_state_lookup(struct LoadCell *lc)
+{
+	int idx = lc->p_filter_buf;
+
+	if ((idx >= 0) && (idx < LOADCELL_MAX_CHANNELS) && (lc_filter_owner[idx] == lc)) {
+		return &lc_filter_states[idx];
+	}
+
+	for (int i = 0; i < LOADCELL_MAX_CHANNELS; i++) {
+		if (lc_filter_owner[i] == lc) {
+			lc->p_filter_buf = i;
+			return &lc_filter_states[i];
+		}
+	}
+
+	return NULL;
+}
+
+static struct lc_filter_state *loadcell_filter_state_get(struct LoadCell *lc)
+{
+	struct lc_filter_state *st = loadcell_filter_state_lookup(lc);
+
+	if (st != NULL) {
+		return st;
+	}
+
+	for (int i = 0; i < LOADCELL_MAX_CHANNELS; i++) {
+		if (lc_filter_owner[i] == NULL) {
+			lc_filter_owner[i] = lc;
+			lc->p_filter_buf = i;
+			return &lc_filter_states[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void loadcell_filter_reset(struct LoadCell *lc)
+{
+	uint32_t key = irq_lock();
+	struct lc_filter_state *st = loadcell_filter_state_get(lc);
+
+	if (st != NULL) {
+		memset(st, 0, sizeof(*st));
+	}
+	lc->filtered_value = 0;
+	irq_unlock(key);
+}
+
+static bool loadcell_filter_process(struct LoadCell *lc, int32_t x, int32_t *out)
+{
+	struct lc_filter_state *st = loadcell_filter_state_lookup(lc);
+	int32_t y = x;
+
+	if (st == NULL) {
+		return false;
+	}
+
+	for (int i = 0; i < LOADCELL_SOS_COUNT; i++) {
+		y = sos_df2t(&lc_sos_coeffs[i], &st->sos[i], y);
+	}
+
+	st->decim_count++;
+	if (st->decim_count >= LOADCELL_DECIM_FACTOR) {
+		st->decim_count = 0;
+		st->last_output = y;
+		if (out != NULL) {
+			*out = y;
+		}
+		return true;
+	}
+
+	return false;
+}
+#endif
 
 #define LOADCELL_EVENT (0x0001)
 static void loadcell_dout_ready_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -61,10 +222,8 @@ void loadcell_setup(struct LoadCell *lc) {
 	lc->is_init = false;
 	lc->previous_value = 0;
 #if LOADCELL_ENABLE_FILTER
-	// init fir filter
-	for (int i = 0; i < SMA; i++) lc->filter_buf[i] = 0;
-	lc->p_filter_buf = 0;
-	lc->filtered_value = 0;
+	lc->p_filter_buf = -1;
+	loadcell_filter_reset(lc);
 #endif
 	// init gpio
     gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
@@ -192,16 +351,15 @@ void loadcell_loop(struct LoadCell *lc) {
 		}
 
 #if LOADCELL_ENABLE_FILTER
-		// filter
-		lc->filter_buf[lc->p_filter_buf] = val;
-		lc->p_filter_buf = (lc->p_filter_buf + 1) % SMA;
-		int32_t _sum = 0;
-		for (int i = 0; i < SMA; i++) _sum += lc->filter_buf[i];
-		key = irq_lock();
-		{
-			lc->filtered_value = (_sum / SMA);
+		// IIR + decimate (80 Hz -> 10 Hz). Update output every 8 samples.
+		int32_t filt_out = 0;
+		if (loadcell_filter_process(lc, val, &filt_out)) {
+			key = irq_lock();
+			{
+				lc->filtered_value = filt_out;
+			}
+			irq_unlock(key);
 		}
-		irq_unlock(key);
 #endif
 	}
 }
