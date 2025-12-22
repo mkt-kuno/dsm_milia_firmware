@@ -42,26 +42,6 @@ int32_t loadcell_get_raw_value_i32(struct LoadCell *lc) {
 	int32_t ret = 0;
 	uint32_t key = irq_lock();
 	{
-		ret = lc->previous_value;
-	}
-	irq_unlock(key);
-    return ret;
-}
-
-int16_t loadcell_get_raw_value(struct LoadCell *lc) {
-	int32_t ret = 0;
-	uint32_t key = irq_lock();
-	{
-		ret = lc->previous_value;
-	}
-	irq_unlock(key);
-    return (int16_t)((ret >> 8) & 0x0000FFFF);
-}
-
-int16_t loadcell_get_filtered_value(struct LoadCell *lc) {
-	float ret = 0.0f;
-	uint32_t key = irq_lock();
-	{
 #if LOADCELL_ENABLE_FILTER
 		ret = lc->filtered_value;
 #else
@@ -69,7 +49,12 @@ int16_t loadcell_get_filtered_value(struct LoadCell *lc) {
 #endif
 	}
 	irq_unlock(key);
-	return ret;
+    return ret;
+}
+
+int16_t loadcell_get_raw_value(struct LoadCell *lc) {
+	int32_t ret = loadcell_get_raw_value_i32(lc);
+    return (int16_t)((ret >> 8) & 0x0000FFFF);
 }
 
 void loadcell_setup(struct LoadCell *lc) {
@@ -81,7 +66,7 @@ void loadcell_setup(struct LoadCell *lc) {
 	// init fir filter
 	for (int i = 0; i < SMA; i++) lc->filter_buf[i] = 0;
 	lc->p_filter_buf = 0;
-	lc->filtered_value = 0.0f;
+	lc->filtered_value = 0;
 #endif
 	// init gpio
     gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
@@ -228,7 +213,7 @@ void loadcell_loop(struct LoadCell *lc) {
 		for (int i = 0; i < SMA; i++) _sum += lc->filter_buf[i];
 		key = irq_lock();
 		{
-			lc->filtered_value = (((_sum/SMA) >> 8) & 0x0000FFFF);;
+			lc->filtered_value = (_sum / SMA);
 		}
 		irq_unlock(key);
 #endif
