@@ -39,7 +39,7 @@ LOG_MODULE_REGISTER(main);
 static int16_t ads1115_result[8];
 static uint16_t gp8403_values[8] = {0};
 
-#define DT_DRV_COMPAT milia_hx711
+#define DT_DRV_COMPAT avia_hx711
 
 #if LOADCELL_ENABLE_INTERRUPT
 #define HX711_INTERRUPT_INIT(inst) .is_interrupt_enable = DT_INST_PROP_OR(inst, interrupt_enable, 0),
