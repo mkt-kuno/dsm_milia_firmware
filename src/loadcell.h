@@ -8,6 +8,7 @@
 #ifndef CONFIG_LOADCELL_FREQ
 #define CONFIG_LOADCELL_FREQ 	(10)
 #endif
+
 #ifndef CONFIG_LOADCELL_ENABLE_FILTER
 #define CONFIG_LOADCELL_ENABLE_FILTER 0
 #endif
@@ -16,9 +17,23 @@
 #define SMA (CONFIG_LOADCELL_FREQ/10)
 #endif
 
+#define LOADCELL_DECIM_FACTOR 8
+#define LOADCELL_SOS_COUNT 5
+
 enum loadcell_chip_type {
     LOADCELL_CHIP_HX711 = 0,
     LOADCELL_CHIP_CS1237 = 1,
+};
+
+struct lc_sos_state {
+	int32_t z1;
+	int32_t z2;
+};
+
+struct lc_filter_state {
+	struct lc_sos_state sos[LOADCELL_SOS_COUNT];
+	uint8_t decim_count;
+	int32_t last_output;
 };
 
 struct LoadCell {
@@ -34,6 +49,7 @@ struct LoadCell {
     int32_t filtered_value;
     int32_t filter_buf[SMA];
     int p_filter_buf;
+    struct lc_filter_state lc_filter_states;
 #endif
 };
 
