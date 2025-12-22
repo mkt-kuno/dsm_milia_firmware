@@ -43,9 +43,13 @@ static uint16_t gp8403_values[8] = {0};
 
 #define HX711_INTERRUPT_INIT(inst) .is_interrupt_enable = DT_INST_PROP_OR(inst, interrupt_enable, 0),
 
+#define LOADCELL_TYPE_INIT(inst) \
+	.chip_type = DT_INST_ENUM_IDX_OR(inst, loadcell_type, LOADCELL_CHIP_HX711),
+
 #define HX711_INIT(inst) { \
 	.dout = GPIO_DT_SPEC_INST_GET(inst, dout_gpios), \
 	.sck = GPIO_DT_SPEC_INST_GET(inst, sck_gpios), \
+	LOADCELL_TYPE_INIT(inst) \
 	HX711_INTERRUPT_INIT(inst) \
 },
 

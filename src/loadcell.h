@@ -5,9 +5,6 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gpio.h>
 
-#define CONFIG_LOADCELL_CS1237  (0)
-#define CONFIG_LOADCELL_HX711   (1)
-
 #ifndef CONFIG_LOADCELL_FREQ
 #define CONFIG_LOADCELL_FREQ 	(10)
 #endif
@@ -16,9 +13,15 @@
 #define SMA (CONFIG_LOADCELL_FREQ/10)
 #endif
 
+enum loadcell_chip_type {
+    LOADCELL_CHIP_HX711 = 0,
+    LOADCELL_CHIP_CS1237 = 1,
+};
+
 struct LoadCell {
     struct gpio_dt_spec dout;
     struct gpio_dt_spec sck;
+    enum loadcell_chip_type chip_type;
     int32_t previous_value;
     bool is_init;
     bool is_interrupt_enable;

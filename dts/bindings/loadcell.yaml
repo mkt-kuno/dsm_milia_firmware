@@ -21,6 +21,15 @@ properties:
     description: |
       SCK pin (serial clock).
 
+  loadcell-type:
+    type: string
+    required: false
+    enum:
+      - hx711
+      - cs1237
+    description: |
+      Load cell ADC model. Defaults to hx711 when omitted.
+
   interrupt-enable:
     type: boolean
     description: |

@@ -79,12 +79,11 @@ void loadcell_setup(struct LoadCell *lc) {
     // Reset and power down
     gpio_pin_set_dt(&lc->sck, 0);
     gpio_pin_set_dt(&lc->sck, 1);
-#if CONFIG_LOADCELL_CS1237
-    k_msleep(100);
-#endif
-#if CONFIG_LOADCELL_HX711
-	k_usleep(100);
-#endif
+	if (lc->chip_type == LOADCELL_CHIP_CS1237) {
+		k_msleep(100);
+	} else {
+		k_usleep(100);
+	}
     gpio_pin_set_dt(&lc->sck, 0);
 
     // Wait for waking up
@@ -121,68 +120,67 @@ void loadcell_loop(struct LoadCell *lc) {
 		key = irq_lock();
 		{
 			val = loadcell_get_24bit_data(lc);
-#if CONFIG_LOADCELL_HX711
-			// 25bit (ch A gain 128)
-			// 26bit (ch B gain 32)
-			// 27bit (ch A gain 64)
+			if (lc->chip_type == LOADCELL_CHIP_CS1237) {
+				// Set Mode "same as HX711 protocol"
+				// keep HIGH, if data is not READY
+				// bit: 25-27
+				loadcell_onebit_in(lc);
+				loadcell_onebit_in(lc);
+				loadcell_onebit_in(lc);
 
-			// set ch A gain 128
-			loadcell_onebit_in(lc);
-#endif
-#if CONFIG_LOADCELL_CS1237
-			// Set Mode "same as HX711 protocol"
-			// keep HIGH, if data is not READY
-			// bit: 25-27
-			loadcell_onebit_in(lc);
-			loadcell_onebit_in(lc);
-			loadcell_onebit_in(lc);
-
-			if (lc->is_init == false) {
-				// set DOUT output
-				gpio_pin_configure_dt(&lc->dout, GPIO_OUTPUT | GPIO_PULL_UP);
-				// 28-29bit (force High)
-				loadcell_onebit_out(lc, 1);
-				loadcell_onebit_out(lc, 1);
-				// set mode Write "Function config" (0x65)
-				// 30-36bit
-				loadcell_onebit_out(lc, 1);
-				loadcell_onebit_out(lc, 1);
-				loadcell_onebit_out(lc, 0);
-				loadcell_onebit_out(lc, 0);
-				loadcell_onebit_out(lc, 1);
-				loadcell_onebit_out(lc, 0);
-				loadcell_onebit_out(lc, 1);
-				// wait 1bit for change dir
-				// 37bit
-				loadcell_onebit_out(lc, 1);
-				// set "Function config"
-				// 38-45bit
-				loadcell_onebit_out(lc, 0);
-				loadcell_onebit_out(lc, 0);
-				// freq bits 00: 10Hz 01: 40Hz
-				// freq bits 10:640Hz 11:1280Hz
+				if (lc->is_init == false) {
+					// set DOUT output
+					gpio_pin_configure_dt(&lc->dout, GPIO_OUTPUT | GPIO_PULL_UP);
+					// 28-29bit (force High)
+					loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 1);
+					// set mode Write "Function config" (0x65)
+					// 30-36bit
+					loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 1);
+					// wait 1bit for change dir
+					// 37bit
+					loadcell_onebit_out(lc, 1);
+					// set "Function config"
+					// 38-45bit
+					loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 0);
+					// freq bits 00: 10Hz 01: 40Hz
+					// freq bits 10:640Hz 11:1280Hz
 #if (CONFIG_LOADCELL_FREQ == 640 || CONFIG_LOADCELL_FREQ == 1280)
-				loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 1);
 #else
-				loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 0);
 #endif
 #if (CONFIG_LOADCELL_FREQ == 40 || CONFIG_LOADCELL_FREQ == 1280)
-				loadcell_onebit_out(lc, 1);
+					loadcell_onebit_out(lc, 1);
 #else
-				loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 0);
 #endif
-				loadcell_onebit_out(lc, 1);// PGA bits  00: x1   01: x2
-				loadcell_onebit_out(lc, 1);// PGA bits  10: x64  11: x128
-				loadcell_onebit_out(lc, 0);
-				loadcell_onebit_out(lc, 0);
-				// wait 1bit for change dir
-				loadcell_onebit_out(lc, 1);
-				// reset DOUT input
-				gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
-				
-				lc->is_init = true;
+					loadcell_onebit_out(lc, 1);// PGA bits  00: x1   01: x2
+					loadcell_onebit_out(lc, 1);// PGA bits  10: x64  11: x128
+					loadcell_onebit_out(lc, 0);
+					loadcell_onebit_out(lc, 0);
+					// wait 1bit for change dir
+					loadcell_onebit_out(lc, 1);
+					// reset DOUT input
+					gpio_pin_configure_dt(&lc->dout, GPIO_INPUT | GPIO_PULL_UP);
+
+					lc->is_init = true;
+				}
+			} else {
+				// 25bit (ch A gain 128)
+				// 26bit (ch B gain 32)
+				// 27bit (ch A gain 64)
+
+				// set ch A gain 128
+				loadcell_onebit_in(lc);
 			}
-#endif
 			lc->previous_value = val;
 		}
 		irq_unlock(key);
