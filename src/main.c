@@ -16,6 +16,7 @@
 #include <zephyr/usb/usbd.h>
 #include <zephyr/modbus/modbus.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
 #include "loadcell.h"
 
@@ -38,40 +39,26 @@ LOG_MODULE_REGISTER(main);
 static int16_t ads1115_result[8];
 static uint16_t gp8403_values[8] = {0};
 
+#define DT_DRV_COMPAT milia_hx711
+
+#if LOADCELL_ENABLE_INTERRUPT
+#define HX711_INTERRUPT_INIT(inst) .is_interrupt_enable = DT_INST_PROP_OR(inst, interrupt_enable, 0),
+#else
+#define HX711_INTERRUPT_INIT(inst)
+#endif
+
+#define HX711_INIT(inst) { \
+	.dout = GPIO_DT_SPEC_INST_GET(inst, dout_gpios), \
+	.sck = GPIO_DT_SPEC_INST_GET(inst, sck_gpios), \
+	HX711_INTERRUPT_INIT(inst) \
+},
+
 static struct LoadCell hx711_list[] = {
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 0),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 0),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 1),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 1),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 2),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 2),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 3),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 3),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 4),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 4),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 5),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 5),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 6),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 6),
-	},
-	{
-		.dout = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_dout), gpios, 7),
-		.sck = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(hx711_sck), gpios, 7),
-	}
+	DT_INST_FOREACH_STATUS_OKAY(HX711_INIT)
 };
+
+#define HX711_COUNT DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT)
+BUILD_ASSERT(HX711_COUNT == 8, "Expected 8 HX711 devices");
 
 #define MODBUS_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_modbus_serial)
 static const struct device *const i2c_dev = DEVICE_DT_GET(DT_ALIAS(i2c_main));
@@ -95,15 +82,10 @@ void hx711_main(void *param1, void *param2, void *param3);
 void gp8403_main(void *param1, void *param2, void *param3);
 void ads1115_main(void *param1, void *param2, void *param3);
 
-// STM32系では、tid_hx711_0の割り込みをFalseにしてポーリングにすること
-K_THREAD_DEFINE(tid_hx711_0, HX711_STACK_SIZE, hx711_main, &hx711_list[0], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_1, HX711_STACK_SIZE, hx711_main, &hx711_list[1], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_2, HX711_STACK_SIZE, hx711_main, &hx711_list[2], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_3, HX711_STACK_SIZE, hx711_main, &hx711_list[3], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_4, HX711_STACK_SIZE, hx711_main, &hx711_list[4], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_5, HX711_STACK_SIZE, hx711_main, &hx711_list[5], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_6, HX711_STACK_SIZE, hx711_main, &hx711_list[6], true,  NULL, HX711_PRIORITY, 0, 0);
-K_THREAD_DEFINE(tid_hx711_7, HX711_STACK_SIZE, hx711_main, &hx711_list[7], true,  NULL, HX711_PRIORITY, 0, 0);
+#define HX711_THREAD_DEFINE(inst) \
+	K_THREAD_DEFINE(tid_hx711_##inst, HX711_STACK_SIZE, hx711_main, &hx711_list[inst], NULL, NULL, HX711_PRIORITY, 0, 0);
+
+DT_INST_FOREACH_STATUS_OKAY(HX711_THREAD_DEFINE)
 K_THREAD_DEFINE(tid_ads1115_0, ADS1115_STACK_SIZE, ads1115_main, 0, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_ads1115_1, ADS1115_STACK_SIZE, ads1115_main, 1, NULL, NULL, ADS1115_PRIORITY, 0, 0);
 K_THREAD_DEFINE(tid_gp8403, GP8403_STACK_SIZE, gp8403_main, NULL, NULL, NULL, GP8403_PRIORITY, 0, 0);
@@ -324,9 +306,10 @@ void ads1115_main(void *param1, void *param2, void *param3)
 
 void hx711_main(void *param1, void *param2, void *param3)
 {
+	ARG_UNUSED(param2);
+	ARG_UNUSED(param3);
 	struct LoadCell *lc = (struct LoadCell *)(param1);
-	bool interrupt_enable = (bool)(param2);
-	loadcell_setup(lc, interrupt_enable);
+	loadcell_setup(lc);
 	loadcell_loop(lc);
 }
 

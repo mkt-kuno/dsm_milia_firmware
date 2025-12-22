@@ -113,27 +113,72 @@
 		};
     };
 
-	hx711_dout: hx711_dout { 
-		compatible = "gpio-loadcell";
-		gpios = <&gpioa 0  GPIO_ACTIVE_HIGH>,
-				<&gpioa 2  GPIO_ACTIVE_HIGH>,
-				<&gpioa 4  GPIO_ACTIVE_HIGH>,
-				<&gpioa 6  GPIO_ACTIVE_HIGH>,
-				<&gpiob 0  GPIO_ACTIVE_HIGH>,
-				<&gpiob 12 GPIO_ACTIVE_HIGH>,
-				<&gpiob 14 GPIO_ACTIVE_HIGH>,
-				<&gpioa 8  GPIO_ACTIVE_HIGH>;
-	};
+	loadcells {
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-	hx711_sck: hx711_sck { 
-		compatible = "gpio-loadcell";
-		gpios = <&gpioa 1  GPIO_ACTIVE_HIGH>,
-				<&gpioa 3  GPIO_ACTIVE_HIGH>,
-				<&gpioa 5  GPIO_ACTIVE_HIGH>,
-				<&gpioa 7  GPIO_ACTIVE_HIGH>,
-				<&gpiob 1  GPIO_ACTIVE_HIGH>,
-				<&gpiob 13 GPIO_ACTIVE_HIGH>,
-				<&gpiob 15 GPIO_ACTIVE_HIGH>,
-				<&gpioa 9  GPIO_ACTIVE_HIGH>;
+		hx711_0: hx711@0 {
+			compatible = "avia,hx711";
+			reg = <0>;
+			dout-gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpioa 1 GPIO_ACTIVE_HIGH>;
+			#interrupt-enable;
+		};
+
+		hx711_1: hx711@1 {
+			compatible = "avia,hx711";
+			reg = <1>;
+			dout-gpios = <&gpioa 2 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_2: hx711@2 {
+			compatible = "avia,hx711";
+			reg = <2>;
+			dout-gpios = <&gpioa 4 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_3: hx711@3 {
+			compatible = "avia,hx711";
+			reg = <3>;
+			dout-gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpioa 7 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_4: hx711@4 {
+			compatible = "avia,hx711";
+			reg = <4>;
+			dout-gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_5: hx711@5 {
+			compatible = "avia,hx711";
+			reg = <5>;
+			dout-gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpiob 13 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_6: hx711@6 {
+			compatible = "avia,hx711";
+			reg = <6>;
+			dout-gpios = <&gpiob 14 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpiob 15 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
+
+		hx711_7: hx711@7 {
+			compatible = "avia,hx711";
+			reg = <7>;
+			dout-gpios = <&gpioa 8 GPIO_ACTIVE_HIGH>;
+			sck-gpios = <&gpioa 9 GPIO_ACTIVE_HIGH>;
+			interrupt-enable;
+		};
 	};
 };

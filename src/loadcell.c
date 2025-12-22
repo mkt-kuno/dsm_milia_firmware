@@ -72,14 +72,11 @@ int16_t loadcell_get_filtered_value(struct LoadCell *lc) {
 	return ret;
 }
 
-void loadcell_setup(struct LoadCell *lc, bool interrupt_enable) {
+void loadcell_setup(struct LoadCell *lc) {
 	int timeout = 1000;
 	// init value
 	lc->is_init = false;
 	lc->previous_value = 0;
-#if LOADCELL_ENABLE_INTERRUPT
-	lc->is_interrupt_enable = interrupt_enable;
-#endif
 #if LOADCELL_ENABLE_FILTER
 	// init fir filter
 	for (int i = 0; i < SMA; i++) lc->filter_buf[i] = 0;

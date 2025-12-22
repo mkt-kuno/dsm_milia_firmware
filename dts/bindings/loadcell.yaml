@@ -1,10 +1,27 @@
-description: GPIO pin for Loadcell
+description: HX711 load cell ADC (GPIO bit-banged)
 
-compatible: "gpio-loadcell"
+compatible: "avia,hx711"
 
 properties:
-  gpios:
+  reg:
+    type: int
+    required: true
+    description: |
+      Instance index used for ordering.
+
+  dout-gpios:
     type: phandle-array
     required: true
     description: |
-      TGPIO pin for Loadcell DOUT/SCK
+      DOUT pin (data ready / data output).
+
+  sck-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      SCK pin (serial clock).
+
+  interrupt-enable:
+    type: boolean
+    description: |
+      Enable GPIO interrupt on DOUT for data-ready signaling.

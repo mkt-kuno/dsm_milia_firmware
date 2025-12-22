@@ -36,7 +36,7 @@ struct LoadCell {
 #endif
 };
 
-void loadcell_setup(struct LoadCell *lc, bool interrupt_enable);
+void loadcell_setup(struct LoadCell *lc);
 void loadcell_loop(struct LoadCell *lc);
 int32_t loadcell_get_raw_value_i32(struct LoadCell *lc);
 int16_t loadcell_get_raw_value(struct LoadCell *lc);
